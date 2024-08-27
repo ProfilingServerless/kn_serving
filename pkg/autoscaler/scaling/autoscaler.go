@@ -283,8 +283,8 @@ func (a *autoscaler) Scale(logger *zap.SugaredLogger, now time.Time) ScaleResult
 	}
 
 	if debugEnabled {
-		desugared.Debug(fmt.Sprintf("PodCount=%d Total1PodCapacity=%0.3f ObsStableValue=%0.3f ObsPanicValue=%0.3f TargetBC=%0.3f ExcessBC=%0.3f",
-			originalReadyPodsCount, spec.TotalValue, observedStableValue,
+        desugared.Debug(fmt.Sprintf("For=%s PodCount=%d Total1PodCapacity=%0.3f ObsStableValue=%0.3f ObsPanicValue=%0.3f TargetBC=%0.3f ExcessBC=%0.3f",
+			a.revision, originalReadyPodsCount, spec.TotalValue, observedStableValue,
 			observedPanicValue, spec.TargetBurstCapacity, excessBCF))
 	}
 

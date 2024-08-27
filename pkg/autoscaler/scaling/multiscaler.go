@@ -18,6 +18,7 @@ package scaling
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -332,6 +333,9 @@ func (m *MultiScaler) createScaler(decider *Decider, key types.NamespacedName) (
 }
 
 func (m *MultiScaler) tickScaler(scaler UniScaler, runner *scalerRunner, metricKey types.NamespacedName) {
+    if a, ok := scaler.(*autoscaler); ok {
+        runner.logger.Debug(fmt.Sprintf("For=%s Ticked", a.revision))
+    }
 	sr := scaler.Scale(runner.logger, time.Now())
 
 	if !sr.ScaleValid {
