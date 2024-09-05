@@ -335,7 +335,7 @@ func (m *MultiScaler) createScaler(decider *Decider, key types.NamespacedName) (
 func (m *MultiScaler) tickScaler(scaler UniScaler, runner *scalerRunner, metricKey types.NamespacedName) {
     tmp := time.Now()
 	sr := scaler.Scale(runner.logger, time.Now())
-    runner.logger.Debug(fmt.Sprintf("Decided in %s", time.Since(tmp))) 
+    runner.logger.Debug(fmt.Sprintf("Decided in %s scale %d", time.Since(tmp), sr.DesiredPodCount)) 
 
 	if !sr.ScaleValid {
 		return
