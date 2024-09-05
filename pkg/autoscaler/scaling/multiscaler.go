@@ -333,10 +333,9 @@ func (m *MultiScaler) createScaler(decider *Decider, key types.NamespacedName) (
 }
 
 func (m *MultiScaler) tickScaler(scaler UniScaler, runner *scalerRunner, metricKey types.NamespacedName) {
-    if a, ok := scaler.(*autoscaler); ok {
-        runner.logger.Debug(fmt.Sprintf("For=%s Ticked", a.revision))
-    }
+    tmp := time.Now()
 	sr := scaler.Scale(runner.logger, time.Now())
+    runner.logger.Debug(fmt.Sprintf("Decided in %s", time.Since(tmp))) 
 
 	if !sr.ScaleValid {
 		return
