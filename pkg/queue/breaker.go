@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"go.uber.org/atomic"
 )
@@ -29,6 +30,38 @@ var (
 	// ErrRequestQueueFull indicates the breaker queue depth was exceeded.
 	ErrRequestQueueFull = errors.New("pending request queue full")
 )
+
+type QueueRecorder struct {
+	sTime       time.Time
+	durations   []int64
+	isRecording bool
+}
+
+func (qr *QueueRecorder) RecordTime(isStart bool) {
+	if isStart {
+		qr.sTime = time.Now()
+		qr.isRecording = true
+	} else {
+		if qr.isRecording {
+			duration := time.Since(qr.sTime).Milliseconds()
+			qr.durations = append(qr.durations, duration)
+			qr.isRecording = false
+		} else {
+			/* do nothing, this is wrong */
+		}
+	}
+}
+
+func (qr *QueueRecorder) GetAverageDuration() (int, float64) {
+	var sum int64 = 0
+	if len(qr.durations) == 0 {
+		return 0, 0
+	}
+	for _, duration := range qr.durations {
+		sum += duration
+	}
+	return len(qr.durations), float64(sum) / float64(len(qr.durations))
+}
 
 // MaxBreakerCapacity is the largest valid value for the MaxConcurrency value of BreakerParams.
 // This is limited by the maximum size of a chan struct{} in the current implementation.
@@ -49,6 +82,7 @@ type Breaker struct {
 	inFlight   atomic.Int64
 	totalSlots int64
 	sem        *semaphore
+	qr         QueueRecorder
 
 	// release is the callback function returned to callers by Reserve to
 	// allow the reservation made by Reserve to be released.
