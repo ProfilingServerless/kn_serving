@@ -23,6 +23,7 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/trace"
@@ -44,6 +45,31 @@ import (
 	"knative.dev/serving/pkg/reconciler/serverlessservice/resources/names"
 )
 
+type throttlerRecorder struct {
+	sTime     time.Time
+	durations []int64
+}
+
+func (tr *throttlerRecorder) RecordTime(isStart bool) {
+	if isStart {
+		tr.sTime = time.Now()
+	} else {
+		duration := time.Since(tr.sTime).Milliseconds()
+		tr.durations = append(tr.durations, duration)
+	}
+}
+
+func (tr *throttlerRecorder) GetAverageDuration() float64 {
+	var sum int64 = 0
+	if len(tr.durations) == 0 {
+		return 0
+	}
+	for _, duration := range tr.durations {
+		sum += duration
+	}
+	return float64(sum) / float64(len(tr.durations))
+}
+
 // Throttler is the interface that Handler calls to Try to proxy the user request.
 type Throttler interface {
 	Try(ctx context.Context, revID types.NamespacedName, fn func(string) error) error
@@ -59,6 +85,7 @@ type activationHandler struct {
 	bufferPool       httputil.BufferPool
 	logger           *zap.SugaredLogger
 	tls              bool
+	ttr              throttlerRecorder
 }
 
 // New constructs a new http.Handler that deals with revision activation.
@@ -87,7 +114,9 @@ func (a *activationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	revID := RevIDFrom(r.Context())
+	a.ttr.RecordTime( /* isStart */ true)
 	if err := a.throttler.Try(tryContext, revID, func(dest string) error {
+		a.ttr.RecordTime( /* isStart */ false)
 		trySpan.End()
 
 		proxyCtx, proxySpan := r.Context(), (*trace.Span)(nil)
@@ -99,6 +128,7 @@ func (a *activationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		return nil
 	}); err != nil {
+		a.ttr.RecordTime( /* isStart */ false)
 		// Set error on our capacity waiting span and end it.
 		trySpan.Annotate([]trace.Attribute{trace.StringAttribute("activator.throttler.error", err.Error())}, "ThrottlerTry")
 		trySpan.End()
@@ -111,6 +141,9 @@ func (a *activationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
+
+	// print average waiting latency
+	a.logger.Warnf("avg throttler duration: %.2f ms", a.ttr.GetAverageDuration())
 }
 
 func (a *activationHandler) proxyRequest(revID types.NamespacedName, w http.ResponseWriter,
