@@ -59,15 +59,15 @@ func (tr *throttlerRecorder) RecordTime(isStart bool) {
 	}
 }
 
-func (tr *throttlerRecorder) GetAverageDuration() float64 {
+func (tr *throttlerRecorder) GetAverageDuration() (int, float64) {
 	var sum int64 = 0
 	if len(tr.durations) == 0 {
-		return 0
+		return 0, 0
 	}
 	for _, duration := range tr.durations {
 		sum += duration
 	}
-	return float64(sum) / float64(len(tr.durations))
+	return len(tr.durations), float64(sum) / float64(len(tr.durations))
 }
 
 // Throttler is the interface that Handler calls to Try to proxy the user request.
@@ -143,7 +143,8 @@ func (a *activationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// print average waiting latency
-	a.logger.Warnf("avg throttler duration: %.2f ms", a.ttr.GetAverageDuration())
+	nbDurations, avgDuration := a.ttr.GetAverageDuration()
+	a.logger.Infof("throttler duration: slice(%v), avg(%.2f ms), len(%v)", a.ttr.durations, avgDuration, nbDurations)
 }
 
 func (a *activationHandler) proxyRequest(revID types.NamespacedName, w http.ResponseWriter,
